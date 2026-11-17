@@ -60,15 +60,6 @@ const CROWD_LABEL = {
   5: 'sehr voll',
 }
 
-// Länderchips kommen aus dem Datensatz – sortiert nach Anzahl der Parks.
-const COUNTRIES = [
-  'Alle',
-  ...Array.from(new Set(PARKS.map((park) => park.country))).sort((a, b) => {
-    const count = (name) => PARKS.filter((park) => park.country === name).length
-    return count(b) - count(a) || a.localeCompare(b, 'de')
-  }),
-]
-
 /* ---------------------------------------------------------------- helpers */
 
 const $ = (sel) => document.querySelector(sel)
@@ -207,7 +198,6 @@ function todayStatus(park) {
 }
 
 function matches(park) {
-  if (state.country !== 'Alle' && park.country !== state.country) return false
   if (!state.query) return true
   const hay = `${park.name} ${park.region} ${park.country} ${park.code}`.toLowerCase()
   return hay.includes(state.query)
@@ -217,7 +207,6 @@ function matches(park) {
 
 const state = {
   query: '',
-  country: 'Alle',
   activeId: null,
   view: 'park', // 'park' | 'list'
   // stops: Zwischenstopps zwischen Start und Park, days = Aufenthalt in Tagen
@@ -327,27 +316,7 @@ function applyFilters() {
   syncMarkers()
   $('#result-count').textContent = String(PARKS.filter(matches).length)
   if (state.view === 'list') renderList()
-  renderChips()
 }
-
-function renderChips() {
-  const host = $('#chips')
-  host.innerHTML = COUNTRIES.map((c) => {
-    const count = c === 'Alle' ? PARKS.length : PARKS.filter((p) => p.country === c).length
-    const dot =
-      c === 'Alle' ? '' : `<span class="dot" style="background:${COUNTRY_COLOR[c]}"></span>`
-    return `<button class="chip" type="button" role="tab" data-country="${c}" aria-selected="${
-      state.country === c
-    }">${dot}${c}<span class="count">${count}</span></button>`
-  }).join('')
-}
-
-$('#chips').addEventListener('click', (e) => {
-  const btn = e.target.closest('.chip')
-  if (!btn) return
-  state.country = btn.dataset.country
-  applyFilters()
-})
 
 $('#search').addEventListener('input', (e) => {
   state.query = e.target.value.trim().toLowerCase()
@@ -703,8 +672,8 @@ function renderList() {
       <div class="list-head" style="margin:0">
         <h2>Alle Bikeparks</h2>
         <p>${list.length} von ${PARKS.length} Parks${
-          state.country !== 'Alle' ? ` · ${escapeHtml(state.country)}` : ''
-        }${state.query ? ` · „${escapeHtml(state.query)}“` : ''}</p>
+          state.query ? ` · „${escapeHtml(state.query)}“` : ''
+        }</p>
       </div>
       <button class="icon-btn" type="button" id="close-btn" aria-label="Sidebar schließen">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
@@ -1204,7 +1173,6 @@ window.addEventListener('resize', () => map.invalidateSize())
 
 /* ------------------------------------------------------------------ init */
 
-renderChips()
 applyFilters()
 map.whenReady(() =>
   window.setTimeout(() => {

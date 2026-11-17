@@ -18,7 +18,7 @@ Gebaut mit Vanilla-JS, Leaflet und Vite.
   auf einen Park) und das Ziel stehen als Zeilen in einer Liste; Stopps lassen sich
   per Drag & Drop umsortieren und bekommen eine Aufenthaltsdauer in Tagen. Route
   kommt von OSRM, wird auf der Karte gezeichnet und als Google-Maps-Link angeboten
-- **Suche** nach Park, Region oder Land und **Land-Filter** über die Chips
+- **Suche** nach Park, Region oder Land
 - **Alle Parks**-Liste mit Preis und Line-Anzahl als Übersicht
 - Responsive: Sidebar als Seitenpanel am Desktop, als Bottom-Sheet auf dem Handy
 

@@ -183,83 +183,6 @@ input {
   color: var(--accent);
 }
 
-/* ----------------------------------------------------------------- chips */
-
-.chips {
-  position: fixed;
-  top: calc(var(--topbar-h) + 12px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 900;
-  display: flex;
-  gap: 6px;
-  padding: 5px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--line);
-  max-width: calc(100vw - 32px);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.chips::-webkit-scrollbar {
-  display: none;
-}
-
-@media (min-width: 861px) {
-  body.sidebar-open .chips {
-    left: calc(var(--sidebar-w) + 14px);
-    right: 14px;
-    transform: none;
-    max-width: none;
-    justify-content: flex-start;
-  }
-}
-
-.chip {
-  flex: none;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.chip:hover {
-  color: var(--text);
-  background: var(--panel-2);
-}
-
-.chip[aria-selected="true"] {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-.chip .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.chip[aria-selected="true"] .dot {
-  outline: 1px solid rgba(0, 0, 0, 0.35);
-}
-
-.chip .count {
-  font-size: 11px;
-  opacity: 0.75;
-  font-variant-numeric: tabular-nums;
-}
-
 /* ------------------------------------------------------------------- map */
 
 #map {
@@ -1202,14 +1125,6 @@ body.picking-stop .pin {
   .btn-ghost {
     padding: 0 11px;
     font-size: 13px;
-  }
-
-  .chips {
-    left: 12px;
-    right: 12px;
-    transform: none;
-    max-width: none;
-    justify-content: flex-start;
   }
 
   .sidebar {
