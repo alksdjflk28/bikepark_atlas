@@ -125,6 +125,56 @@ function fmtSpan(hours) {
   return rest ? `${label} ${rest} Std.` : label
 }
 
+// "08:30" → 8,5 – daraus lassen sich die Liftstunden eines Tages berechnen.
+function clockHours(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || '').trim())
+  return match ? Number(match[1]) + Number(match[2]) / 60 : null
+}
+
+// Empfehlung: wie viel Zeit der Park braucht, um alle Strecken in Ruhe zu fahren.
+// Abgeleitet aus Lines und Liftzeit, damit jeder Park eine Einordnung bekommt.
+function stayAdvice(park) {
+  const lines = Number(park.lines) || 0
+  const from = clockHours(park.hoursFrom)
+  const to = clockHours(park.hoursTo)
+  const lift = from != null && to != null && to > from ? to - from : null
+  const liftText = lift
+    ? ` bei rund ${Number(lift.toFixed(1)).toLocaleString('de-DE')} Stunden Liftbetrieb`
+    : ''
+
+  const isTrail = park.type === 'trailpark'
+  const days = isTrail
+    ? lines >= 10
+      ? 2
+      : 1
+    : lines >= 20
+      ? 3
+      : lines >= 12
+        ? 2
+        : 1
+
+  const allLines =
+    lines === 1 ? 'die einzige Line' : lines > 1 ? `alle ${lines} Lines` : 'alle Strecken'
+  const allRounds =
+    lines === 1 ? 'die eine Runde' : lines > 1 ? `die ${lines} Runden` : 'alle Runden'
+
+  let note
+  if (isTrail) {
+    note =
+      days === 1
+        ? `Ein Tag im Sattel reicht für ${allRounds}: ohne Lift zählt die eigene Kondition, plane den Anstieg mit ein.`
+        : `Zwei Tage für das ganze Netz – ${allRounds} ohne Lift schaffst du nur mit Übernachtung entspannt.`
+  } else if (days === 1) {
+    note = `Ein voller Tag${liftText} reicht, um ${allLines} mehrmals zu fahren – früh starten, dann bleiben Reserven für die Lieblingsabfahrt.`
+  } else if (days === 2) {
+    note = `Zwei Tage sind realistisch: Tag eins für ${allLines}, Tag zwei für die Favoriten und die schnellen Runden.`
+  } else {
+    note = `Drei Tage, wenn du ${allLines} ohne Hetze fahren willst – mit Pausen, Reifenwechsel und Zeit für die besten Abfahrten.`
+  }
+
+  return { days, label: days === 1 ? '1 Tag' : `${days} Tage`, note }
+}
+
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
 function escapeHtml(str) {
@@ -500,6 +550,7 @@ function renderPark(park) {
 
   const linesValue = park.lines == null ? '–' : String(park.lines)
   const daysNote = park.openDays.length === 7 ? 'täglich' : `${park.openDays.length} Tage / Woche`
+  const stay = stayAdvice(park)
 
   $('#sidebar-content').innerHTML = `
     <div class="sb-top">
@@ -537,6 +588,17 @@ function renderPark(park) {
         <div class="fact-sub">${daysNote}</div>
       </div>
     </div>
+
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">Empfehlung</h2>
+        <span class="section-note">Zeit für den ganzen Park</span>
+      </div>
+      <div class="stay-card">
+        <span class="stay-days">${stay.label}</span>
+        <p class="stay-note">${escapeHtml(stay.note)}</p>
+      </div>
+    </section>
 
     <section class="section">
       <div class="section-head">
@@ -827,8 +889,8 @@ function renderStops() {
   const stopRows = state.route.stops
     .map(
       (stop, i) => `
-      <div class="stop-row" data-stop="${i}" draggable="true">
-        <span class="drag-handle" aria-hidden="true">
+      <div class="stop-row" data-stop="${i}">
+        <span class="drag-handle" draggable="true" title="Am Griff ziehen, um den Stopp zu verschieben">
           <svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor"><circle cx="3" cy="3" r="1.3"/><circle cx="7" cy="3" r="1.3"/><circle cx="3" cy="8" r="1.3"/><circle cx="7" cy="8" r="1.3"/><circle cx="3" cy="13" r="1.3"/><circle cx="7" cy="13" r="1.3"/></svg>
         </span>
         <span class="stop-num">${i + 1}</span>
@@ -1019,6 +1081,8 @@ function wirePlanner(park) {
   })
 
   stopsHost.addEventListener('dragstart', (e) => {
+    // Nur der Griff startet das Ziehen – die Felder bleiben normal bedienbar.
+    if (!(e.target instanceof Element) || !e.target.closest('.drag-handle')) return
     const row = e.target.closest('.stop-row[data-stop]')
     if (!row) return
     dragIndex = Number(row.dataset.stop)

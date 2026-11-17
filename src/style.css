@@ -646,6 +646,33 @@ body.sidebar-open .sidebar {
   color: var(--muted);
 }
 
+/* Empfehlung: wie lange der Park braucht */
+.stay-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
+}
+
+.stay-days {
+  flex: none;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.stay-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #b7c1cb;
+}
+
 .kv {
   display: flex;
   justify-content: space-between;
@@ -823,16 +850,28 @@ body.sidebar-open .sidebar {
 
 .drag-handle {
   flex: none;
+  align-self: stretch;
   display: grid;
   place-items: center;
-  width: 10px;
+  width: 14px;
+  border-radius: 6px;
   color: var(--muted);
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .stop-row:hover .drag-handle {
   opacity: 1;
+}
+
+.drag-handle:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .stop-row.dragging {
