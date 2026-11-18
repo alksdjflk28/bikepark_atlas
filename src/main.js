@@ -4,19 +4,20 @@ import './style.css'
 import L from 'leaflet'
 import 'leaflet.markercluster'
 import { PARKS } from './parks.js'
+import { pt } from './park-translations.js'
+import {
+  TR,
+  LANG_KEY,
+  currentLang,
+  loadLang,
+  setLang,
+  t,
+  dayShort as ds,
+  dayLong as dl,
+  countryName as cn,
+} from './i18n.js'
 
 /* ------------------------------------------------------------------ data */
-
-const DAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
-const DAY_LONG = [
-  'Montag',
-  'Dienstag',
-  'Mittwoch',
-  'Donnerstag',
-  'Freitag',
-  'Samstag',
-  'Sonntag',
-]
 
 const COUNTRY_COLOR = {
   Deutschland: '#a3e635',
@@ -52,14 +53,6 @@ const CROWD_COLOR = {
   5: '#ef4444',
 }
 
-const CROWD_LABEL = {
-  1: 'sehr ruhig',
-  2: 'ruhig',
-  3: 'mittel',
-  4: 'voll',
-  5: 'sehr voll',
-}
-
 /* ---------------------------------------------------------------- helpers */
 
 const $ = (sel) => document.querySelector(sel)
@@ -93,27 +86,27 @@ function fmtDuration(seconds) {
   const total = Math.round(seconds / 60)
   const h = Math.floor(total / 60)
   const m = total % 60
-  if (h === 0) return `${m} Min.`
-  return m === 0 ? `${h} Std.` : `${h} Std. ${m} Min.`
+  if (h === 0) return `${m} ${t('minAbbr')}`
+  return m === 0 ? `${h} ${t('hourAbbr')}` : `${h} ${t('hourAbbr')} ${m} ${t('minAbbr')}`
 }
 
 // Aufenthalte werden in Tagen angegeben (0,5 = halber Tag).
 function fmtDays(days) {
-  if (!days) return '0 Std.'
+  if (!days) return `0 ${t('hourAbbr')}`
   const whole = Math.floor(days)
   const rest = Math.round((days - whole) * 24)
-  if (whole === 0) return `${Math.round(days * 24)} Std.`
-  const label = whole === 1 ? '1 Tag' : `${whole} Tage`
-  return rest ? `${label} ${rest} Std.` : label
+  if (whole === 0) return `${Math.round(days * 24)} ${t('hourAbbr')}`
+  const label = whole === 1 ? t('daySingular') : `${whole} ${t('daysAbbr')}`
+  return rest ? `${label} ${rest} ${t('hourAbbr')}` : label
 }
 
 // Gesamtzeit in Stunden als Tage/Stunden ausgeben.
 function fmtSpan(hours) {
   const days = Math.floor(hours / 24)
   const rest = Math.round(hours % 24)
-  if (!days) return rest === 1 ? '1 Std.' : `${rest} Std.`
-  const label = days === 1 ? '1 Tag' : `${days} Tage`
-  return rest ? `${label} ${rest} Std.` : label
+  if (!days) return rest === 1 ? `1 ${t('hourAbbr')}` : `${rest} ${t('hourAbbr')}`
+  const label = days === 1 ? t('daySingular') : `${days} ${t('daysAbbr')}`
+  return rest ? `${label} ${rest} ${t('hourAbbr')}` : label
 }
 
 // "08:30" → 8,5 – daraus lassen sich die Liftstunden eines Tages berechnen.
@@ -123,14 +116,13 @@ function clockHours(value) {
 }
 
 // Empfehlung: wie viel Zeit der Park braucht, um alle Strecken in Ruhe zu fahren.
-// Abgeleitet aus Lines und Liftzeit, damit jeder Park eine Einordnung bekommt.
 function stayAdvice(park) {
   const lines = Number(park.lines) || 0
   const from = clockHours(park.hoursFrom)
   const to = clockHours(park.hoursTo)
   const lift = from != null && to != null && to > from ? to - from : null
   const liftText = lift
-    ? ` bei rund ${Number(lift.toFixed(1)).toLocaleString('de-DE')} Stunden Liftbetrieb`
+    ? ` bei rund ${Number(lift.toFixed(1)).toLocaleString('de-DE')} ${t('hourAbbr')} Liftbetrieb`
     : ''
 
   const isTrail = park.type === 'trailpark'
@@ -145,25 +137,25 @@ function stayAdvice(park) {
         : 1
 
   const allLines =
-    lines === 1 ? 'die einzige Line' : lines > 1 ? `alle ${lines} Lines` : 'alle Strecken'
+    lines === 1 ? t('dieEinzigeLine') : lines > 1 ? `alle ${lines} Lines` : 'alle Strecken'
   const allRounds =
-    lines === 1 ? 'die eine Runde' : lines > 1 ? `die ${lines} Runden` : 'alle Runden'
+    lines === 1 ? t('dieEineRunde') : lines > 1 ? `die ${lines} Runden` : 'alle Runden'
 
   let note
   if (isTrail) {
     note =
       days === 1
-        ? `Ein Tag im Sattel reicht für ${allRounds}: ohne Lift zählt die eigene Kondition, plane den Anstieg mit ein.`
-        : `Zwei Tage für das ganze Netz – ${allRounds} ohne Lift schaffst du nur mit Übernachtung entspannt.`
+        ? t('stayTrail1', { rounds: allRounds })
+        : t('stayTrail2', { rounds: allRounds })
   } else if (days === 1) {
-    note = `Ein voller Tag${liftText} reicht, um ${allLines} mehrmals zu fahren – früh starten, dann bleiben Reserven für die Lieblingsabfahrt.`
+    note = t('stay1', { lift: liftText, lines: allLines })
   } else if (days === 2) {
-    note = `Zwei Tage sind realistisch: Tag eins für ${allLines}, Tag zwei für die Favoriten und die schnellen Runden.`
+    note = t('stay2', { lines: allLines })
   } else {
-    note = `Drei Tage, wenn du ${allLines} ohne Hetze fahren willst – mit Pausen, Reifenwechsel und Zeit für die besten Abfahrten.`
+    note = t('stay3', { lines: allLines })
   }
 
-  return { days, label: days === 1 ? '1 Tag' : `${days} Tage`, note }
+  return { days, label: days === 1 ? t('daySingular') : `${days} ${t('daysAbbr')}`, note }
 }
 
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -179,10 +171,10 @@ function seasonStatus(park) {
   const now = new Date()
   const iso = now.toISOString().slice(0, 10)
   if (park.seasonFrom && iso < park.seasonFrom) {
-    return { open: false, text: `Saison startet am ${fmtDate(park.seasonFrom)}` }
+    return { open: false, text: t('seasonStarts', { date: fmtDate(park.seasonFrom) }) }
   }
   if (park.seasonTo && iso > park.seasonTo) {
-    return { open: false, text: `Saison endete am ${fmtDate(park.seasonTo)}` }
+    return { open: false, text: t('seasonEnded', { date: fmtDate(park.seasonTo) }) }
   }
   return { open: true, text: null }
 }
@@ -192,9 +184,9 @@ function todayStatus(park) {
   const season = seasonStatus(park)
   if (!season.open) return season
   if (!park.openDays.includes(idx)) {
-    return { open: false, text: `Heute (${DAY_LONG[idx]}) Ruhetag` }
+    return { open: false, text: t('todayClosed', { day: dl(idx) }) }
   }
-  return { open: true, text: `Heute geöffnet · ${park.hoursFrom}–${park.hoursTo} Uhr` }
+  return { open: true, text: t('todayOpen', { from: park.hoursFrom, to: park.hoursTo }) }
 }
 
 function matches(park) {
@@ -209,9 +201,6 @@ const state = {
   query: '',
   activeId: null,
   view: 'park', // 'park' | 'list'
-  // stops: Zwischenstopps zwischen Start und Park, days = Aufenthalt in Tagen
-  // stopPick: Index des Stopps, der per Kartenklick auf einen Park gefüllt wird
-  // startText: was im Startfeld steht (bleibt beim Neu-Rendern der Liste erhalten)
   route: {
     from: null,
     fromLabel: null,
@@ -224,32 +213,16 @@ const state = {
 
 /* ------------------------------------------------------------------- map */
 
-const map = L.map('map', {
-  zoomControl: false,
-  minZoom: 4,
-  maxZoom: 16,
-  scrollWheelZoom: true,
-}).setView([50.4, 9.6], 5.5)
+// 2-Klick-Lösung: Leaflet-Karte und OpenStreetMap-Kacheln entstehen erst nach ausdrücklicher
+// Zustimmung – vorher gibt es keine Verbindung zu OpenStreetMap.
+const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+const OSM_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'
 
-L.control.zoom({ position: 'bottomright' }).addTo(map)
-
-// Esri Dark Gray Canvas – kein API-Key nötig
-L.tileLayer(
-  'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-  {
-    attribution:
-      'Kartengrundlage: &copy; Esri, HERE, Garmin, FAO, NOAA, USGS, <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende',
-    maxZoom: 16,
-  },
-).addTo(map)
-
-L.tileLayer(
-  'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-  { maxZoom: 16, opacity: 0.9 },
-).addTo(map)
+let map = null
 
 const markers = new Map()
-const routeLayer = L.layerGroup().addTo(map)
+const routeLayer = L.layerGroup()
 
 // Viele Parks in den Alpen überlappen sich – deshalb Clustering.
 const clusterGroup = L.markerClusterGroup({
@@ -266,7 +239,6 @@ const clusterGroup = L.markerClusterGroup({
       iconAnchor: [23, 23],
     }),
 })
-map.addLayer(clusterGroup)
 
 function markerHtml(park) {
   const color = COUNTRY_COLOR[park.country] || '#a3e635'
@@ -306,9 +278,55 @@ function syncMarkers() {
   })
 }
 
-// Nach Zoom/Clustering sind die Pin-DOMs neu – Zustände neu vergeben.
-map.on('zoomend', () => syncMarkers())
+// Nach Clustering sind die Pin-DOMs neu – Zustände neu vergeben.
 clusterGroup.on('animationend', () => syncMarkers())
+
+// Baut die Karte erst auf, wenn die Zustimmung vorliegt oder gerade erteilt wurde.
+function initMap() {
+  if (map) return map
+
+  map = L.map('map', {
+    zoomControl: false,
+    minZoom: 4,
+    maxZoom: 16,
+    scrollWheelZoom: true,
+  }).setView([50.4, 9.6], 5.5)
+
+  L.control.zoom({ position: 'bottomright' }).addTo(map)
+
+  L.tileLayer(OSM_TILES, {
+    attribution: OSM_ATTRIBUTION,
+    subdomains: 'abcd',
+    maxZoom: 16,
+  }).addTo(map)
+
+  map.addLayer(clusterGroup)
+  routeLayer.addTo(map)
+
+  map.on('zoomend', () => syncMarkers())
+
+  // Klick auf die Karte setzt im Planer einen Startpunkt auf der Karte
+  map.on('click', (e) => {
+    if (!state.route.pickMode || !state.activeId) return
+    const park = PARKS.find((p) => p.id === state.activeId)
+    if (!park) return
+    const from = { lat: e.latlng.lat, lng: e.latlng.lng }
+    const label = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`
+    state.route.pickMode = false
+    state.route.startText = label
+    $('#map').style.cursor = ''
+    renderStops()
+    computeRoute(park, from, label, resolvedStops())
+  })
+
+  document.body.classList.add('map-ready')
+  window.setTimeout(() => {
+    map.invalidateSize()
+    fitAll()
+  }, 80)
+
+  return map
+}
 
 /* -------------------------------------------------------------- filtering */
 
@@ -353,6 +371,7 @@ function allBounds() {
 }
 
 function fitAll(animate = false) {
+  if (!map) return
   map.fitBounds(allBounds(), {
     paddingTopLeft: [46, 96],
     paddingBottomRight: [46, 74],
@@ -361,6 +380,7 @@ function fitAll(animate = false) {
 }
 
 function adjustForSidebar(park) {
+  if (!map) return
   const size = map.getSize()
   if (window.innerWidth > 860) {
     const sidebarW = $('#sidebar').offsetWidth || 420
@@ -377,6 +397,7 @@ function adjustForSidebar(park) {
 }
 
 function centerOnPark(park) {
+  if (!map) return
   const wanted = Math.max(map.getZoom(), 11)
   map.flyTo([park.lat, park.lng], wanted, { duration: 0.7 })
 
@@ -393,7 +414,7 @@ function centerOnPark(park) {
 // Park hängt noch in einem Cluster -> so weit hineinzoomen, bis die Pin einzeln steht.
 function revealMarker(park, done) {
   const marker = markers.get(park.id)?.marker
-  if (!marker || map.hasLayer(marker)) return done()
+  if (!map || !marker || map.hasLayer(marker)) return done()
 
   let steps = 0
   const step = () => {
@@ -498,16 +519,16 @@ function renderPark(park) {
     .map((level, i) => {
       if (level == null) {
         return `<div class="crowd-col closed${i === today ? ' today' : ''}">
-            <div class="crowd-bar-track" title="${DAY_LONG[i]}: Ruhetag"></div>
-            <div class="crowd-day">${DAY_SHORT[i]}</div>
+            <div class="crowd-bar-track" title="${dl(i)}: ${t('crowdClosed')}"></div>
+            <div class="crowd-day">${ds(i)}</div>
           </div>`
       }
       const h = 18 + level * 16
       return `<div class="crowd-col${i === today ? ' today' : ''}">
-          <div class="crowd-bar-track" title="${DAY_LONG[i]}: ${CROWD_LABEL[level]}">
+          <div class="crowd-bar-track" title="${dl(i)}: ${t(`crowdL${level}`)}">
             <div class="crowd-bar" style="height:${h}%;background:${CROWD_COLOR[level]}"></div>
           </div>
-          <div class="crowd-day">${DAY_SHORT[i]}</div>
+          <div class="crowd-day">${ds(i)}</div>
         </div>`
     })
     .join('')
@@ -515,53 +536,55 @@ function renderPark(park) {
   const season =
     park.seasonFrom && park.seasonTo
       ? `${fmtDate(park.seasonFrom)} – ${fmtDate(park.seasonTo)}`
-      : 'keine feste Angabe'
+      : t('seasonNone')
 
   const linesValue = park.lines == null ? '–' : String(park.lines)
-  const daysNote = park.openDays.length === 7 ? 'täglich' : `${park.openDays.length} Tage / Woche`
+  const daysNote =
+    park.openDays.length === 7 ? t('täglich') : `${park.openDays.length} ${t('tageProWoche')}`
   const stay = stayAdvice(park)
 
-  $('#sidebar-content').innerHTML = `
+  try {
+    $('#sidebar-content').innerHTML = `
     <div class="sb-top">
       <span class="code-badge">
         <span class="dot" style="background:${COUNTRY_COLOR[park.country]}"></span>
-        ${escapeHtml(park.code)} · ${escapeHtml(park.country)}
+        ${escapeHtml(park.code)} · ${escapeHtml(cn(park.country))}
       </span>
-      <button class="icon-btn" type="button" id="close-btn" aria-label="Sidebar schließen">
+      <button class="icon-btn" type="button" id="close-btn" aria-label="${t('closeSidebar')}">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
     </div>
 
-    <h1 class="sb-title">${escapeHtml(park.name)}</h1>
-    <p class="sb-region">${park.type === 'trailpark' ? 'Trailpark ohne Lift · ' : ''}${escapeHtml(park.region)} · ${escapeHtml(park.country)}</p>
-    <p class="sb-lede">${escapeHtml(park.lede)}</p>
+    <h1 class="sb-title">${escapeHtml(pt(park, 'name'))}</h1>
+    <p class="sb-region">${park.type === 'trailpark' ? t('trailparkOhneLift') + ' · ' : ''}${escapeHtml(pt(park, 'region'))} · ${escapeHtml(cn(park.country))}</p>
+    <p class="sb-lede">${escapeHtml(pt(park, 'lede'))}</p>
 
     <div class="status ${status.open ? 'open' : 'closed'}">
-      <span class="dot"></span>${escapeHtml(status.text || 'Geschlossen')}
+      <span class="dot"></span>${escapeHtml(status.text || t('geschlossen'))}
     </div>
 
     <div class="facts">
       <div class="fact">
-        <div class="fact-label">Tageskarte</div>
+        <div class="fact-label">${t('factTicket')}</div>
         <div class="fact-value">${fmtPrice(park.price)}</div>
-        <div class="fact-sub">${escapeHtml(park.price?.note || '')}</div>
+        <div class="fact-sub">${escapeHtml(pt(park, 'priceNote') || park.price?.note || '')}</div>
       </div>
       <div class="fact">
-        <div class="fact-label">Lines</div>
+        <div class="fact-label">${t('factLines')}</div>
         <div class="fact-value">${linesValue}</div>
-        <div class="fact-sub">${escapeHtml(park.linesNote || '')}</div>
+        <div class="fact-sub">${escapeHtml(pt(park, 'linesNote') || park.linesNote || '')}</div>
       </div>
       <div class="fact">
-        <div class="fact-label">Offen</div>
-        <div class="fact-value">${escapeHtml(park.days)}</div>
+        <div class="fact-label">${t('factOpen')}</div>
+        <div class="fact-value">${pt(park, 'days')}</div>
         <div class="fact-sub">${daysNote}</div>
       </div>
     </div>
 
     <section class="section">
       <div class="section-head">
-        <h2 class="section-title">Empfehlung</h2>
-        <span class="section-note">Zeit für den ganzen Park</span>
+        <h2 class="section-title">${t('stayTitle')}</h2>
+        <span class="section-note">${t('staySubtitle')}</span>
       </div>
       <div class="stay-card">
         <span class="stay-days">${stay.label}</span>
@@ -571,54 +594,55 @@ function renderPark(park) {
 
     <section class="section">
       <div class="section-head">
-        <h2 class="section-title">Öffnungszeiten</h2>
-        <span class="section-note">Saison ${escapeHtml(season)}</span>
+        <h2 class="section-title">${t('hoursTitle')}</h2>
+        <span class="section-note">${t('hoursSubtitle')} ${escapeHtml(season)}</span>
       </div>
       <dl class="kv-list" style="margin:0">
-        <div class="kv"><dt>Öffnungstage</dt><dd>${escapeHtml(park.days)}</dd></div>
-        <div class="kv"><dt>Uhrzeit</dt><dd>${escapeHtml(park.hours)}${park.hoursNote ? ` <span style="color:var(--muted);font-weight:400">(${escapeHtml(park.hoursNote)})</span>` : ''}</dd></div>
-        <div class="kv"><dt>Saison</dt><dd>${escapeHtml(season)}</dd></div>
+        <div class="kv"><dt>${t('hoursDays')}</dt><dd>${pt(park, 'days')}</dd></div>
+        <div class="kv"><dt>${t('hoursTime')}</dt><dd>${escapeHtml(park.hours)}${park.hoursNote ? ` <span style="color:var(--muted);font-weight:400">(${escapeHtml(pt(park, 'hoursNote') || park.hoursNote)})</span>` : ''}</dd></div>
+        <div class="kv"><dt>${t('hoursSeason')}</dt><dd>${escapeHtml(season)}</dd></div>
       </dl>
     </section>
 
     <section class="section">
       <div class="section-head">
-        <h2 class="section-title">Wie viel los ist</h2>
-        <span class="section-note">Durchschnitt, Mo – So</span>
+        <h2 class="section-title">${t('crowdTitle')}</h2>
+        <span class="section-note">${t('crowdSubtitle')}</span>
       </div>
       <div class="crowd">${crowdCols}</div>
       <div class="crowd-legend">
-        ${[1, 2, 3, 4, 5].map((n) => `<span><i style="background:${CROWD_COLOR[n]}"></i>${CROWD_LABEL[n]}</span>`).join('')}
-        <span><i style="background:#2a323c"></i>Ruhetag</span>
+        ${[1, 2, 3, 4, 5]
+          .map((n) => `<span><i style="background:${CROWD_COLOR[n]}"></i>${t(`crowdL${n}`)}</span>`)
+          .join('')}
+        <span><i style="background:#2a323c"></i>${t('crowdClosed')}</span>
       </div>
-      ${park.crowdNote ? `<p class="crowd-note">${escapeHtml(park.crowdNote)}</p>` : ''}
+      ${pt(park, 'crowdNote') ? `<p class="crowd-note">${escapeHtml(pt(park, 'crowdNote'))}</p>` : ''}
     </section>
 
     <section class="section">
       <div class="section-head">
-        <h2 class="section-title">Routenplaner</h2>
-        <span class="section-note">Autofahrt mit Stopps</span>
+        <h2 class="section-title">${t('plannerTitle')}</h2>
+        <span class="section-note">${t('plannerSubtitle')}</span>
       </div>
-              <div class="planner">
-          <div class="stops" id="rp-stops"></div>
-          <div class="planner-actions">
-            <button class="btn" type="button" id="rp-add-stop">+ Zwischenstopp</button>
-            <button class="btn btn-primary" type="button" id="rp-go">Route</button>
-          </div>
+      <div class="planner">
+        <div class="stops" id="rp-stops"></div>
+        <div class="planner-actions">
+          <button class="btn" type="button" id="rp-add-stop">+ ${t('zwischenStopp')}</button>
+          <button class="btn btn-primary" type="button" id="rp-go">${t('goBtn')}</button>
+        </div>
 
-
-        <div class="planner-status" id="rp-status">Gib einen Startpunkt ein oder lasse dich zu ${escapeHtml(park.name)} leiten.</div>
+        <div class="planner-status" id="rp-status">${t('statusEnterStart', { name: escapeHtml(park.name) })}</div>
         <div class="route-result" id="rp-result">
           <div class="route-metrics">
-            <div class="route-metric"><div class="big" id="rp-dist">–</div><div class="small">Entfernung</div></div>
-            <div class="route-metric"><div class="big" id="rp-time">–</div><div class="small">Fahrzeit</div></div>
-            <div class="route-metric"><div class="big" id="rp-all">–</div><div class="small">Gesamt</div></div>
+            <div class="route-metric"><div class="big" id="rp-dist">–</div><div class="small">${t('dist')}</div></div>
+            <div class="route-metric"><div class="big" id="rp-time">–</div><div class="small">${t('time')}</div></div>
+            <div class="route-metric"><div class="big" id="rp-all">–</div><div class="small">${t('total')}</div></div>
           </div>
           <p class="route-total" id="rp-stay"></p>
           <p class="route-from" id="rp-from"></p>
           <div class="planner-actions">
-            <a class="btn" id="rp-maps" href="#" target="_blank" rel="noopener">In Google Maps öffnen</a>
-            <button class="btn" type="button" id="rp-reset">Zurücksetzen</button>
+            <a class="btn" id="rp-maps" href="#" target="_blank" rel="noopener">${t('openMaps')}</a>
+            <button class="btn" type="button" id="rp-reset">${t('resetBtn')}</button>
           </div>
         </div>
       </div>
@@ -626,18 +650,20 @@ function renderPark(park) {
 
     <div class="actions">
       <a class="btn btn-primary btn-block" href="${escapeHtml(park.website)}" target="_blank" rel="noopener">
-        Website von ${escapeHtml(park.name)} öffnen
+        ${t('openWebsite', { name: escapeHtml(park.name) })}
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>
       </a>
-      <button class="btn btn-block" type="button" id="all-btn">Alle Parks anzeigen</button>
+      <button class="btn btn-block" type="button" id="all-btn">${t('showAll')}</button>
     </div>
 
     <p class="footnote">
-      Daten ohne Gewähr, Stand November 2026 – Öffnungszeiten und Preise können kurzfristig
-      abweichen, bitte auf der Website des Parks prüfen. Auslastung ist eine Schätzung für
-      typische Tage, kein Live-Wert.
+      ${t('footnote')}
     </p>
   `
+  } catch (e) {
+    $('#sidebar-content').innerHTML = '<div style="padding:20px;color:#fca5a5;">Fehler beim Rendern: ' + escapeHtml(e.message) + '</div>'
+    console.error('renderPark error:', e)
+  }
 
   wirePlanner(park)
   $('#close-btn').addEventListener('click', closeSidebar)
@@ -656,31 +682,29 @@ function renderList() {
               <span class="code" style="background:${color}">${escapeHtml(p.code)}</span>
               <span>
                 <span class="nm">${escapeHtml(p.name)}</span>
-                <span class="rg">${escapeHtml(p.region)} · ${escapeHtml(p.country)}</span>
+                <span class="rg">${escapeHtml(pt(p, 'region'))} · ${escapeHtml(cn(p.country))}</span>
               </span>
               <span class="meta"><b>${escapeHtml(price)}</b>${
-                p.lines == null ? 'keine Lines' : p.lines === 1 ? '1 Line' : `${p.lines} Lines`
+                p.lines == null ? t('keineLines') : p.lines === 1 ? '1 Line' : `${p.lines} Lines`
               }</span>
             </button>
           </li>`
         })
         .join('')}</ul>`
-    : `<div class="empty">Kein Park gefunden.<br />Versuche einen anderen Suchbegriff.</div>`
+    : `<div class="empty">${t('keinPark')}<br />${t('andererSuchbegriff')}</div>`
 
   $('#sidebar-content').innerHTML = `
     <div class="sb-top">
       <div class="list-head" style="margin:0">
-        <h2>Alle Bikeparks</h2>
-        <p>${list.length} von ${PARKS.length} Parks${
-          state.query ? ` · „${escapeHtml(state.query)}“` : ''
-        }</p>
+        <h2>${t('listTitle')}</h2>
+        <p>${t('listCount', { count: list.length, total: PARKS.length })}${state.query ? ` · „${escapeHtml(state.query)}“` : ''}</p>
       </div>
-      <button class="icon-btn" type="button" id="close-btn" aria-label="Sidebar schließen">
+      <button class="icon-btn" type="button" id="close-btn" aria-label="${t('closeSidebar')}">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
     </div>
     <div style="margin-top:14px">${body}</div>
-    <p class="footnote">Klicke einen Park, um Details, Öffnungszeiten und den Routenplaner zu sehen.</p>
+    <p class="footnote">${t('listFootnote')}</p>
   `
 
   $('#close-btn').addEventListener('click', closeSidebar)
@@ -762,6 +786,7 @@ function drawRoute(park, route, stops = []) {
       )
   })
 
+  if (!map) return
   map.fitBounds(L.latLngBounds(latlngs).pad(0.12), {
     paddingTopLeft: window.innerWidth > 860 ? [($('#sidebar').offsetWidth || 420) + 20, 60] : [20, 90],
     paddingBottomRight: [60, 60],
@@ -779,7 +804,7 @@ function showRouteResult(park, route, fromLabel, stops = []) {
   $('#rp-all').textContent = fmtSpan(totalHours)
   $('#rp-stay').textContent = stops.length
     ? `Aufenthalt: ${fmtDays(dwellDays)} an ${stops.length} Zwischenstopp${stops.length === 1 ? '' : 's'}`
-    : 'Ohne Zwischenstopp – reine Fahrt zum Park.'
+    : t('withoutStop')
   $('#rp-from').textContent = `Start: ${fromLabel}`
 
   const waypoints = stops.map((stop) => `${stop.lat},${stop.lng}`).join('|')
@@ -788,7 +813,7 @@ function showRouteResult(park, route, fromLabel, stops = []) {
   $('#rp-maps').href = mapsUrl
 
   $('#rp-status').classList.remove('error')
-  $('#rp-status').textContent = 'Route berechnet.'
+  $('#rp-status').textContent = t('statusRouteDone')
   drawRoute(park, route, stops)
 }
 
@@ -842,15 +867,14 @@ function renderStops() {
       <span class="stop-num start">S</span>
       <label class="field">
         <input id="rp-input" class="stop-input start-input" type="text"
-          placeholder="Startadresse oder Ort …" autocomplete="off"
+          placeholder="${t('startadresse')}" autocomplete="off"
           value="${escapeHtml(startText)}" />
       </label>
-      <button class="icon-btn" type="button" data-geo aria-label="Meinen Standort verwenden"
-        title="Meinen Standort verwenden">
+      <button class="icon-btn" type="button" data-geo aria-label="${t('meinStandort')}" title="${t('meinStandort')}">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.4M12 18.1v3.4M2.5 12h3.4M18.1 12h3.4"/></svg>
       </button>
       <button class="icon-btn" type="button" data-pick aria-pressed="${state.route.pickMode}"
-        aria-label="Start auf der Karte wählen" title="Start auf der Karte wählen">
+        aria-label="${t('startAufKarte')}" title="${t('startAufKarte')}">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>
       </button>
     </div>`
@@ -859,20 +883,18 @@ function renderStops() {
     .map(
       (stop, i) => `
       <div class="stop-row" data-stop="${i}">
-        <span class="drag-handle" draggable="true" title="Am Griff ziehen, um den Stopp zu verschieben">
+        <span class="drag-handle" draggable="true" title="${t('amGriffZiehen')}">
           <svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor"><circle cx="3" cy="3" r="1.3"/><circle cx="7" cy="3" r="1.3"/><circle cx="3" cy="8" r="1.3"/><circle cx="7" cy="8" r="1.3"/><circle cx="3" cy="13" r="1.3"/><circle cx="7" cy="13" r="1.3"/></svg>
         </span>
         <span class="stop-num">${i + 1}</span>
         <label class="field">
-          <input class="stop-input" type="text" placeholder="Zwischenstopp, Ort oder Adresse …"
-            value="${escapeHtml(stop.label)}" autocomplete="off" />
+          <input class="stop-input" type="text" placeholder="${t('zwischenStoppOrt')}" value="${escapeHtml(stop.label)}" autocomplete="off" />
         </label>
-        <label class="stay" title="Aufenthalt in Tagen">
-          <input class="stop-days" type="number" min="0" step="0.5" value="${Number(stop.days) || 0}"
-            aria-label="Aufenthalt in Tagen" />
-          <span>Tage</span>
+        <label class="stay" title="${t('aufenthaltTagen')}">
+          <input class="stop-days" type="number" min="0" step="0.5" value="${Number(stop.days) || 0}" aria-label="${t('aufenthaltTagen')}" />
+          <span>${t('tage')}</span>
         </label>
-        <button class="icon-btn" type="button" data-remove="${i}" aria-label="Zwischenstopp entfernen">
+        <button class="icon-btn" type="button" data-remove="${i}" aria-label="${t('zwischenstoppEntfernen')}">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
       </div>`,
@@ -884,7 +906,7 @@ function renderStops() {
         <span class="stop-num end">E</span>
         <span class="stop-fixed">
           <span class="stop-fixed-name">${escapeHtml(park.name)}</span>
-          <span class="stop-fixed-sub">${park.type === 'trailpark' ? 'Trailpark · ' : ''}${escapeHtml(park.region)} · ${escapeHtml(park.country)}</span>
+          <span class="stop-fixed-sub">${park.type === 'trailpark' ? t('trailpark') + ' · ' : ''}${escapeHtml(pt(park, 'region'))} · ${escapeHtml(cn(park.country))}</span>
         </span>
         <span class="stop-tag">Ziel</span>
       </div>`
@@ -912,14 +934,14 @@ function wirePlanner(park) {
     const q = startValue()
     if (!q) {
       status.classList.add('error')
-      status.textContent = 'Bitte einen Startort eingeben.'
+      status.textContent = t('bitteStartort')
       return
     }
 
     state.route.startText = q
     const stops = state.route.stops.filter((stop) => stop.label.trim())
     status.classList.remove('error')
-    status.textContent = 'Suche Startort …'
+    status.textContent = t('statusSearching')
 
     try {
       const from = await geocode(q)
@@ -927,7 +949,7 @@ function wirePlanner(park) {
       // Zwischenstopps ohne Koordinaten nacheinander auflösen (Nominatim-Limit).
       for (const stop of stops) {
         if (stop.lat != null && stop.lng != null) continue
-        status.textContent = `Suche Zwischenstopp „${stop.label}“ …`
+        status.textContent = t('statusSearchingStop', { name: stop.label })
         try {
           const hit = await geocode(stop.label)
           stop.lat = hit.lat
@@ -948,7 +970,7 @@ function wirePlanner(park) {
   const useGeo = () => {
     if (!navigator.geolocation) {
       status.classList.add('error')
-      status.textContent = 'Dein Browser unterstützt keine Standortabfrage.'
+      status.textContent = t('statusGeoSupport')
       return
     }
     status.classList.remove('error')
@@ -963,7 +985,7 @@ function wirePlanner(park) {
       },
       () => {
         status.classList.add('error')
-        status.textContent = 'Standort konnte nicht ermittelt werden.'
+        status.textContent = t('statusGeoErr')
       },
       { enableHighAccuracy: true, timeout: 12000 },
     )
@@ -974,9 +996,7 @@ function wirePlanner(park) {
     $('#map').style.cursor = state.route.pickMode ? 'crosshair' : ''
     renderStops()
     status.classList.remove('error')
-    status.textContent = state.route.pickMode
-      ? 'Klicke jetzt einen Startpunkt auf der Karte.'
-      : 'Klickmodus beendet.'
+    status.textContent = state.route.pickMode ? t('statusPick') : t('statusPickEnd')
   }
 
   // Drag & Drop: nur die Zwischenstopps lassen sich umsortieren, Start und Ziel sind fix.
@@ -1039,7 +1059,7 @@ function wirePlanner(park) {
     routeLayer.clearLayers()
     $('#rp-result').classList.remove('show')
     status.classList.remove('error')
-    status.textContent = 'Zwischenstopp entfernt.'
+    status.textContent = t('zwischenstoppEntfernt')
   })
 
   stopsHost.addEventListener('keydown', (e) => {
@@ -1050,7 +1070,6 @@ function wirePlanner(park) {
   })
 
   stopsHost.addEventListener('dragstart', (e) => {
-    // Nur der Griff startet das Ziehen – die Felder bleiben normal bedienbar.
     if (!(e.target instanceof Element) || !e.target.closest('.drag-handle')) return
     const row = e.target.closest('.stop-row[data-stop]')
     if (!row) return
@@ -1087,7 +1106,7 @@ function wirePlanner(park) {
     if (moveStop(from, insertAt)) {
       refreshRoute()
       status.classList.remove('error')
-      status.textContent = 'Reihenfolge angepasst – Zwischenstopp verschoben.'
+      status.textContent = t('reihenfolgeAngepasst')
     }
   })
 
@@ -1116,26 +1135,13 @@ function wirePlanner(park) {
     renderStops()
     $('#rp-result').classList.remove('show')
     status.classList.remove('error')
-    status.textContent = 'Zurückgesetzt – wähle einen neuen Startpunkt.'
+    status.textContent = t('zurueckgesetzt')
   })
 
   if (state.route.from) {
     computeRoute(park, state.route.from, state.route.fromLabel || 'Gespeicherter Start', resolvedStops())
   }
 }
-
-map.on('click', (e) => {
-  if (!state.route.pickMode || !state.activeId) return
-  const park = PARKS.find((p) => p.id === state.activeId)
-  if (!park) return
-  const from = { lat: e.latlng.lat, lng: e.latlng.lng }
-  const label = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`
-  state.route.pickMode = false
-  state.route.startText = label
-  $('#map').style.cursor = ''
-  renderStops()
-  computeRoute(park, from, label, resolvedStops())
-})
 
 /* ------------------------------------------------------------- chrome UI */
 
@@ -1154,10 +1160,12 @@ $('#scrim').addEventListener('click', closeSidebar)
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (state.route.stopPick != null) {
+    if (document.body.classList.contains('modal-open')) {
+      closePrivacy()
+    } else if (state.route.stopPick != null) {
       cancelStopPick()
       const status = $('#rp-status')
-      if (status) status.textContent = 'Auswahl abgebrochen – Zwischenstopp bleibt leer.'
+      if (status) status.textContent = t('auswahlAbgebrochen')
     } else {
       closeSidebar()
     }
@@ -1169,17 +1177,172 @@ document.addEventListener('keydown', (e) => {
   }
 })
 
-window.addEventListener('resize', () => map.invalidateSize())
+window.addEventListener('resize', () => map?.invalidateSize())
+
+/* ------------------------------------------------------------- Spracheinwahl */
+
+function renderLangSwitch() {
+  const host = $('#lang-switch')
+  if (!host) return
+  const langs = [
+    { code: 'de', label: 'Deutsch' },
+    { code: 'en', label: 'English' },
+    { code: 'it', label: 'Italiano' },
+  ]
+  host.innerHTML = langs
+    .map(
+      (l) =>
+        `<button type="button" data-lang="${l.code}" aria-pressed="${currentLang === l.code}" aria-label="${l.label}">${l.code.toUpperCase()}</button>`,
+    )
+    .join('')
+}
+
+function applyLang() {
+  renderLangSwitch()
+  // Alle data-i18n-Elemente im DOM aktualisieren (Text)
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const key = el.getAttribute('data-i18n')
+    el.textContent = t(key)
+  })
+  // Alle data-i18n-html-Elemente im DOM aktualisieren (innerHTML)
+  document.querySelectorAll('[data-i18n-html]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-html')
+    el.innerHTML = t(key)
+  })
+  // Placeholder aktualisieren
+  const search = $('#search')
+  if (search) search.placeholder = t('searchPlaceholder')
+  // Consent-Titel und -Text (sind über data-i18n / data-i18n-html abgedeckt, aber sicherheitshalber)
+  // Wenn Sidebar offen, neu rendern
+  if (state.activeId) {
+    const park = PARKS.find((p) => p.id === state.activeId)
+    if (park) renderPark(park)
+  } else if (state.view === 'list') {
+    renderList()
+  }
+}
+
+$('#lang-switch').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-lang]')
+  if (!btn) return
+  setLang(btn.dataset.lang)
+  applyLang()
+})
+
+/* ------------------------------------------------------------- chrome UI (weitere) */
+
+window.addEventListener('langchange', () => applyLang())
 
 /* ------------------------------------------------------------------ init */
 
+loadLang()
+applyLang()
 applyFilters()
-map.whenReady(() =>
-  window.setTimeout(() => {
-    map.invalidateSize()
-    fitAll()
-  }, 120),
-)
+
+/* --------------------------------------------- Einwilligung + Datenschutz */
+
+const CONSENT_KEY = 'bikepark-atlas:map-consent'
+const consentOverlay = $('#map-consent')
+const privacyModal = $('#privacy-modal')
+
+function hasMapConsent() {
+  try {
+    return localStorage.getItem(CONSENT_KEY) === 'granted'
+  } catch {
+    return false
+  }
+}
+
+function grantMapConsent() {
+  try {
+    localStorage.setItem(CONSENT_KEY, 'granted')
+  } catch {
+    // Privater Modus o. Ä.: die Zustimmung gilt dann nur für diesen Aufruf.
+  }
+  consentOverlay.hidden = true
+  initMap()
+}
+
+function revokeMapConsent() {
+  try {
+    localStorage.removeItem(CONSENT_KEY)
+  } catch {
+    // dann gibt es nichts zu löschen
+  }
+  // Neu laden, damit Karte und geladene Kacheln wirklich verschwinden.
+  window.location.reload()
+}
+
+function openPrivacy() {
+  privacyModal.hidden = false
+  document.body.classList.add('modal-open')
+  $('#privacy-close').focus()
+}
+
+function closePrivacy() {
+  if (privacyModal.hidden) return
+  privacyModal.hidden = true
+  document.body.classList.remove('modal-open')
+  $('#privacy-link').focus()
+}
+
+$('#consent-accept').addEventListener('click', grantMapConsent)
+$('#consent-revoke').addEventListener('click', revokeMapConsent)
+$('#privacy-link').addEventListener('click', openPrivacy)
+$('#privacy-close').addEventListener('click', closePrivacy)
+privacyModal.addEventListener('click', (e) => {
+  if (e.target.closest('[data-close-privacy]')) closePrivacy()
+})
+
+if (hasMapConsent()) {
+  consentOverlay.hidden = true
+  initMap()
+}
 
 // Debug-Helfer (unschädlich, nur für die Entwicklungskonsole)
-window.__atlas = { map, clusterGroup, markers, state, openPark, syncMarkers }
+window.__atlas = {
+  get map() {
+    return map
+  },
+  clusterGroup,
+  markers,
+  state,
+  openPark,
+  syncMarkers,
+  setLang,
+  t,
+}
+
+// Zusätzliche Übersetzungs-Keys, die im Code inline benötigt werden
+const INLINE = {
+  täglich: t('täglich'),
+  tageProWoche: t('tageProWoche'),
+  geschlossen: t('geschlossen'),
+  dieEinzigeLine: t('dieEinzigeLine'),
+  dieEineRunde: t('dieEineRunde'),
+  zwischenStopp: t('zwischenStopp'),
+  keinPark: t('keinPark'),
+  andererSuchbegriff: t('andererSuchbegriff'),
+  startadresse: t('startadresse'),
+  meinStandort: t('meinStandort'),
+  startAufKarte: t('startAufKarte'),
+  amGriffZiehen: t('amGriffZiehen'),
+  zwischenStoppOrt: t('zwischenStoppOrt'),
+  aufenthaltTagen: t('aufenthaltTagen'),
+  tage: t('tage'),
+  zwischenstoppEntfernen: t('zwischenstoppEntfernen'),
+  bitteStartort: t('bitteStartort'),
+  zwischenstoppEntfernt: t('zwischenstoppEntfernt'),
+  reihenfolgeAngepasst: t('reihenfolgeAngepasst'),
+  zurueckgesetzt: t('zurueckgesetzt'),
+  auswahlAbgebrochen: t('auswahlAbgebrochen'),
+  trailpark: t('trailpark'),
+  trailparkOhneLift: t('trailparkOhneLift'),
+  ohneLift: t('ohneLift'),
+}
+
+// Die Inline-Vars werden bei Sprachwechsel neu gesetzt
+window.__atlas.setLang = (lang) => {
+  setLang(lang)
+  applyLang()
+}

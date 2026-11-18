@@ -20,6 +20,9 @@ Gebaut mit Vanilla-JS, Leaflet und Vite.
   kommt von OSRM, wird auf der Karte gezeichnet und als Google-Maps-Link angeboten
 - **Suche** nach Park, Region oder Land
 - **Alle Parks**-Liste mit Preis und Line-Anzahl als Übersicht
+- **Datenschutz**: Karte lädt erst nach Klick (2-Klick-Lösung, Zustimmung in
+  `localStorage`, jederzeit widerrufbar); Link „Datenschutz / Privacy“ unten links
+  öffnet die Datenschutzerklärung als Modal
 - Responsive: Sidebar als Seitenpanel am Desktop, als Bottom-Sheet auf dem Handy
 
 ## Daten
@@ -48,7 +51,7 @@ und Preise können abweichen – bitte immer auf der Website des Parks prüfen.
 
 | Zweck | Dienst |
 | --- | --- |
-| Kartengrundlage | Esri Dark Gray Canvas |
+| Kartengrundlage | CARTO Dark Matter (Daten: OpenStreetMap) |
 | Geocoding | Nominatim (OpenStreetMap) |
 | Routen | OSRM Public Demo Server |
 
