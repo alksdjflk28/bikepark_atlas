@@ -76,7 +76,7 @@ export const TR = {
     openMaps: 'In Google Maps öffnen',
     resetBtn: 'Zurücksetzen',
 
-    footnote: 'Daten ohne Gewähr, Stand November 2026 – Öffnungszeiten und Preise können kurzfristig abweichen, bitte auf der Website des Parks prüfen. Auslastung ist eine Schätzung für typische Tage, kein Live-Wert.',
+    footnote: 'Daten ohne Gewähr, Stand {date} – Öffnungszeiten und Preise können kurzfristig abweichen, bitte auf der Website des Parks prüfen. Auslastung ist eine Schätzung für typische Tage, kein Live-Wert.',
     openWebsite: 'Website von {name} öffnen',
 
     // ---------- Wochentage ----------
@@ -254,7 +254,7 @@ export const TR = {
     openMaps: 'Open in Google Maps',
     resetBtn: 'Reset',
 
-    footnote: 'Data without guarantee, status November 2026 – opening hours and prices may change at short notice, please check the park’s website. Occupancy is an estimate for typical days, no live value.',
+    footnote: 'Data without guarantee, status {date} – opening hours and prices may change at short notice, please check the park’s website. Occupancy is an estimate for typical days, no live value.',
     openWebsite: 'Open website of {name}',
 
     // ---------- Wochentage ----------
@@ -432,7 +432,7 @@ export const TR = {
     openMaps: 'Apri in Google Maps',
     resetBtn: 'Reimposta',
 
-    footnote: 'Dati senza garanzia, aggiornamento novembre 2026 – orari e prezzi possono variare in breve tempo, controlla il sito del parco. Affollamento è una stima per giorni tipici, nessun valore in tempo reale.',
+    footnote: 'Dati senza garanzia, aggiornamento {date} – orari e prezzi possono variare in breve tempo, controlla il sito del parco. Affollamento è una stima per giorni tipici, nessun valore in tempo reale.',
     openWebsite: 'Apri sito web di {name}',
 
     // ---------- Wochentage ----------

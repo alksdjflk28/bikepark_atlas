@@ -1,0 +1,70 @@
+name: Wöchentlicher Link-Check
+
+# Montags 03:00 UTC = 04:00 (Winterzeit) bzw. 05:00 (Sommerzeit) in Deutschland.
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Bun einrichten
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Abhängigkeiten installieren
+        run: bun install --frozen-lockfile
+
+      # Erst bauen (Stand aus public/data/parks.json) …
+      - name: Bauen
+        run: bun run build
+
+      # … dann prüfen: schreibt dist/data/parks.json und dist/data/audit.json.
+      - name: Websites prüfen
+        run: bun run update
+
+      - name: Prüfbericht als Artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit
+          path: dist/data/audit.json
+
+      - name: Neuen Datensatz nach public/ übernehmen
+        run: bun tools/weekly-update.mjs --promote
+
+      - name: Geänderte Daten committen
+        run: |
+          git config user.name "bikepark-atlas-bot"
+          git config user.email "bikepark-atlas-bot@users.noreply.github.com"
+          git add public/data/parks.json
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen an den Daten."
+            exit 0
+          fi
+          git commit -m "Daten: wöchentlicher Link-Check ($(date -u +%F))"
+          git push
+
+      - name: Zu Netlify deployen
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "Keine Netlify-Zugangsdaten hinterlegt – Deploy übersprungen."
+            echo "Anleitung: README, Abschnitt 'Wöchentliches Datenupdate'."
+            exit 0
+          fi
+          npx --yes netlify-cli@17 deploy --prod --dir=dist

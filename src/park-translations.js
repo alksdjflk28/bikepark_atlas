@@ -4474,6 +4474,10 @@ export const PARK_TRANSLATIONS = {
 /* ------------------------------------------------------------------ helpers */
 
 export function pt(park, field) {
+  // Eigene Übersetzung direkt am Park (z. B. über den Editor ergänzt) hat Vorrang.
+  const own = park.i18n?.[currentLang]?.[field]
+  if (own) return own
+
   const translations = PARK_TRANSLATIONS[park.id]
   if (!translations) return park[field]
   const langTranslations = translations[currentLang]

@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "dev": "bun node_modules/vite/bin/vite.js --host 0.0.0.0",
+    "build": "bun node_modules/vite/bin/vite.js build",
+    "preview": "bun node_modules/vite/bin/vite.js preview --host 0.0.0.0",
+    "update": "bun tools/weekly-update.mjs"
   },
   "devDependencies": {
     "vite": "^8.3.0"

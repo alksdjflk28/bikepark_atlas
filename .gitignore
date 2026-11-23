@@ -2,5 +2,7 @@ node_modules/
 dist/
 .env
 .vite-dev.log
+.update.log
 .env.*
 !.env.example
+.preview.log

@@ -3,8 +3,9 @@ import './style.css'
 
 import L from 'leaflet'
 import 'leaflet.markercluster'
-import { PARKS } from './parks.js'
+import { PARKS, META, loadParks } from './parks.js'
 import { pt } from './park-translations.js'
+import { initEditor } from './editor.js'
 import {
   TR,
   LANG_KEY,
@@ -16,6 +17,19 @@ import {
   dayLong as dl,
   countryName as cn,
 } from './i18n.js'
+
+/* ------------------------------------------------------------- park data */
+
+// Der Datensatz kommt aus dist/data/parks.json (Quelle: public/data/parks.json).
+// Er wird vor allem anderen geladen, damit ein wöchentlicher Datenlauf nur
+// diese Datei ersetzen muss – ohne neuen JS-Build.
+let parksError = null
+try {
+  await loadParks()
+} catch (err) {
+  parksError = err
+  console.error('Parkdaten nicht geladen:', err)
+}
 
 /* ------------------------------------------------------------------ data */
 
@@ -66,6 +80,11 @@ function fmtDate(iso) {
   if (!iso) return null
   const [y, m, d] = iso.split('-')
   return `${d}.${m}.${y}`
+}
+
+// Stand des Datensatzes für den Fußnoten-Text
+function dataStand() {
+  return META.updatedAt ? fmtDate(META.updatedAt) : 'November 2026'
 }
 
 function fmtPrice(price) {
@@ -245,7 +264,7 @@ function markerHtml(park) {
   return `<span class="pin" style="--pin:${color}">${escapeHtml(park.code)}</span>`
 }
 
-PARKS.forEach((park) => {
+function addMarker(park) {
   const icon = L.divIcon({
     className: 'pin-wrap',
     html: markerHtml(park),
@@ -259,7 +278,45 @@ PARKS.forEach((park) => {
     .on('click', () => handleParkClick(park))
 
   markers.set(park.id, { marker, park })
-})
+  return marker
+}
+
+PARKS.forEach(addMarker)
+
+// Vom Editor (Strg+M) genutzt: Park ergänzen bzw. wieder entfernen.
+function addPark(park) {
+  if (!park || !park.id) return false
+  if (PARKS.some((p) => p.id === park.id)) return false
+  PARKS.push(park)
+  addMarker(park)
+  syncMarkers()
+  applyFilters()
+  return true
+}
+
+function removePark(id) {
+  const index = PARKS.findIndex((p) => p.id === id)
+  if (index === -1) return false
+  PARKS.splice(index, 1)
+  const entry = markers.get(id)
+  if (entry) {
+    clusterGroup.removeLayer(entry.marker)
+    markers.delete(id)
+  }
+  if (state.activeId === id) closeSidebar()
+  applyFilters()
+  return true
+}
+
+// Ohne Datensatz bleibt die Seite sonst leer und es gibt keinen Hinweis warum.
+if (parksError) {
+  document.body.insertAdjacentHTML(
+    'afterbegin',
+    `<div style="position:fixed;left:0;right:0;bottom:0;z-index:9999;padding:12px 16px;background:#7f1d1d;color:#fff;font:14px/1.4 system-ui,sans-serif;text-align:center">
+      Die Parkdaten konnten nicht geladen werden (${escapeHtml(parksError.message)}). Bitte die Seite neu laden.
+    </div>`,
+  )
+}
 
 function syncMarkers() {
   markers.forEach(({ marker, park }, id) => {
@@ -547,7 +604,7 @@ function renderPark(park) {
     $('#sidebar-content').innerHTML = `
     <div class="sb-top">
       <span class="code-badge">
-        <span class="dot" style="background:${COUNTRY_COLOR[park.country]}"></span>
+        <span class="dot" style="background:${COUNTRY_COLOR[park.country] || '#a3e635'}"></span>
         ${escapeHtml(park.code)} · ${escapeHtml(cn(park.country))}
       </span>
       <button class="icon-btn" type="button" id="close-btn" aria-label="${t('closeSidebar')}">
@@ -650,14 +707,14 @@ function renderPark(park) {
 
     <div class="actions">
       <a class="btn btn-primary btn-block" href="${escapeHtml(park.website)}" target="_blank" rel="noopener">
-        ${t('openWebsite', { name: escapeHtml(park.name) })}
+        ${t('openWebsite', { name: escapeHtml(pt(park, 'name')) })}
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>
       </a>
       <button class="btn btn-block" type="button" id="all-btn">${t('showAll')}</button>
     </div>
 
     <p class="footnote">
-      ${t('footnote')}
+      ${t('footnote', { date: dataStand() })}
     </p>
   `
   } catch (e) {
@@ -681,7 +738,7 @@ function renderList() {
             <button class="park-item" type="button" data-id="${p.id}">
               <span class="code" style="background:${color}">${escapeHtml(p.code)}</span>
               <span>
-                <span class="nm">${escapeHtml(p.name)}</span>
+                <span class="nm">${escapeHtml(pt(p, 'name'))}</span>
                 <span class="rg">${escapeHtml(pt(p, 'region'))} · ${escapeHtml(cn(p.country))}</span>
               </span>
               <span class="meta"><b>${escapeHtml(price)}</b>${
@@ -1298,6 +1355,64 @@ if (hasMapConsent()) {
   consentOverlay.hidden = true
   initMap()
 }
+
+/* --------------------------------------------------- Position auf der Karte */
+
+// Der Editor blendet sich aus und wartet auf einen Klick auf die Karte.
+// Liefert { lat, lng } oder null, wenn abgebrochen wurde.
+function pickLocation() {
+  if (!map) return Promise.reject(new Error('Die Karte ist noch nicht geladen.'))
+
+  return new Promise((resolve) => {
+    const hint = document.createElement('div')
+    hint.className = 'pick-hint'
+    hint.innerHTML =
+      '<span>Klicke auf die Karte, um die Position zu setzen</span>' +
+      '<button class="btn btn-ghost" type="button">Abbrechen</button>'
+    document.body.appendChild(hint)
+
+    const mapEl = $('#map')
+    const previousCursor = mapEl.style.cursor
+    mapEl.style.cursor = 'crosshair'
+    document.body.classList.add('picking-location')
+
+    const finish = (value) => {
+      map.off('click', onClick)
+      document.removeEventListener('keydown', onKey, true)
+      hint.remove()
+      document.body.classList.remove('picking-location')
+      mapEl.style.cursor = previousCursor
+      resolve(value)
+    }
+
+    function onClick(event) {
+      finish({ lat: event.latlng.lat, lng: event.latlng.lng })
+    }
+
+    function onKey(event) {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      finish(null)
+    }
+
+    hint.querySelector('button').addEventListener('click', () => finish(null))
+    map.on('click', onClick)
+    document.addEventListener('keydown', onKey, true)
+  })
+}
+
+/* ------------------------------------------------- geheimer Park-Editor */
+
+// Strg+M öffnet den Editor – bewusst ohne sichtbaren Link.
+initEditor({
+  getParks: () => PARKS,
+  onAdd: addPark,
+  onRemove: removePark,
+  openPark,
+  getMapCenter: () => (map ? map.getCenter() : null),
+  pickLocation,
+})
 
 // Debug-Helfer (unschädlich, nur für die Entwicklungskonsole)
 window.__atlas = {
