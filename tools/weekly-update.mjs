@@ -119,8 +119,9 @@ async function checkPark(park) {
     } catch {}
 
     let kind = 'ok'
-    // 403/429 heißt meist Bot-Schutz, nicht toter Link.
-    if (!res.ok) kind = res.status === 403 || res.status === 429 ? 'blocked' : 'error'
+    // 403/429 heißt meist Bot-Schutz, 5xx ein kaputter Server – beides kein
+    // toter Link. Nur echte 4xx (404, 410 …) zählen als tot.
+    if (!res.ok) kind = res.status === 403 || res.status === 429 || res.status >= 500 ? 'blocked' : 'error'
     return { kind, status: res.status, finalUrl }
   } catch (err) {
     const message = String(err?.message ?? err)
@@ -157,6 +158,19 @@ const started = Date.now()
 
 const results = await pool(parks, CONCURRENCY, async (park) => ({ park, ...(await checkPark(park)) }))
 
+// Ein einzelner Aussetzer ist noch kein toter Link: Fehlschläge einmal
+// nachfassen, bevor sie im Bericht landen.
+const flaky = results
+  .map((result, index) => (result.kind === 'error' || result.kind === 'network' ? index : -1))
+  .filter((index) => index >= 0)
+
+if (flaky.length) {
+  await new Promise((resolve) => setTimeout(resolve, 3000))
+  for (const index of flaky) {
+    results[index] = { park: results[index].park, ...(await checkPark(results[index].park)) }
+  }
+}
+
 const ok = []
 const moved = []
 const blocked = []
@@ -186,6 +200,11 @@ for (const { park, kind, status, finalUrl, error } of results) {
   }
   if (kind === 'timeout') {
     slow.push({ id: park.id, name: park.name, url: park.website })
+    continue
+  }
+  if (kind === 'network') {
+    // Verbindungsabbruch von hier aus (Firewall, Rate-Limit, Routing) – kein Beweis für einen toten Link.
+    blocked.push({ id: park.id, name: park.name, url: park.website, status: 0, error })
     continue
   }
   dead.push({ id: park.id, name: park.name, url: park.website, status, error })

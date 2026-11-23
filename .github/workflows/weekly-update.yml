@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/weekly-update.yml'
+      - 'tools/weekly-update.mjs'
 
 permissions:
   contents: write

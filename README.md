@@ -101,9 +101,11 @@ Felder zeigen weiterhin den deutschen Text.
 - `dist/data/parks.json` – Datensatz mit frischem `meta.updatedAt` (das Datum
   erscheint in der Fußnote der Sidebar); bei einem dauerhaften Domainwechsel
   wird `website` aktualisiert
-- `dist/data/audit.json` – Prüfbericht: tote Links, Bot-Schutz bzw. Zertifikats-
-  fehler (`blocked`), Zeitüberschreitungen (`slow`), abgelaufene und bald endende
-  Saisons, Parks ohne Preis
+- `dist/data/audit.json` – Prüfbericht: tote Links (echte 4xx wie 404/410),
+  `blocked` (Bot-Schutz, Zertifikatsfehler, Serverfehler ab 500, abgebrochene
+  Verbindungen), Zeitüberschreitungen (`slow`), abgelaufene und bald endende
+  Saisons, Parks ohne Preis. Fehlschläge werden vor der Einstufung einmal
+  wiederholt, damit einzelne Aussetzer keinen Fehlalarm auslösen.
 
 ```sh
 bun run update        # identisch: tools/weekly-update.cmd
