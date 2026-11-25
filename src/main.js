@@ -214,12 +214,59 @@ function matches(park) {
   return hay.includes(state.query)
 }
 
+// Sortierung der Parkliste (Dropdown im Kopf der Liste).
+function priceValue(park) {
+  const amount = park.price?.amount
+  return Number.isFinite(amount) ? amount : null
+}
+
+function lineValue(park) {
+  return park.lines == null ? null : Number(park.lines)
+}
+
+function sortedParks(list) {
+  const items = [...list]
+  const locale = currentLang || 'de'
+  const byName = (a, b) =>
+    pt(a, 'name').localeCompare(pt(b, 'name'), locale, { sensitivity: 'base' })
+
+  // Parks ohne Preis bzw. ohne Lines stehen immer am Ende – egal in welche Richtung.
+  const byNumber = (getValue, direction) => (a, b) => {
+    const va = getValue(a)
+    const vb = getValue(b)
+    if (va == null && vb == null) return byName(a, b)
+    if (va == null) return 1
+    if (vb == null) return -1
+    return va === vb ? byName(a, b) : direction * (va - vb)
+  }
+
+  switch (state.sort) {
+    case 'country':
+      return items.sort(
+        (a, b) =>
+          cn(a.country).localeCompare(cn(b.country), locale, { sensitivity: 'base' }) ||
+          byName(a, b),
+      )
+    case 'price-asc':
+      return items.sort(byNumber(priceValue, 1))
+    case 'price-desc':
+      return items.sort(byNumber(priceValue, -1))
+    case 'lines-asc':
+      return items.sort(byNumber(lineValue, 1))
+    case 'lines-desc':
+      return items.sort(byNumber(lineValue, -1))
+    default:
+      return items
+  }
+}
+
 /* ------------------------------------------------------------------ state */
 
 const state = {
   query: '',
   activeId: null,
   view: 'park', // 'park' | 'list'
+  sort: 'default', // Sortierung der Parkliste
   route: {
     from: null,
     fromLabel: null,
@@ -728,7 +775,7 @@ function renderPark(park) {
 }
 
 function renderList() {
-  const list = PARKS.filter(matches)
+  const list = sortedParks(PARKS.filter(matches))
   const body = list.length
     ? `<ul class="park-list">${list
         .map((p) => {
@@ -750,6 +797,20 @@ function renderList() {
         .join('')}</ul>`
     : `<div class="empty">${t('keinPark')}<br />${t('andererSuchbegriff')}</div>`
 
+  const sortOptions = [
+    ['default', t('sortDefault')],
+    ['country', t('sortCountry')],
+    ['price-asc', t('sortPriceAsc')],
+    ['price-desc', t('sortPriceDesc')],
+    ['lines-asc', t('sortLinesAsc')],
+    ['lines-desc', t('sortLinesDesc')],
+  ]
+    .map(
+      ([value, label]) =>
+        `<option value="${value}"${state.sort === value ? ' selected' : ''}>${escapeHtml(label)}</option>`,
+    )
+    .join('')
+
   $('#sidebar-content').innerHTML = `
     <div class="sb-top">
       <div class="list-head" style="margin:0">
@@ -760,11 +821,20 @@ function renderList() {
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
     </div>
+    <label class="list-sort">
+      <span>${t('sortBy')}</span>
+      <select id="list-sort">${sortOptions}</select>
+    </label>
     <div style="margin-top:14px">${body}</div>
     <p class="footnote">${t('listFootnote')}</p>
   `
 
   $('#close-btn').addEventListener('click', closeSidebar)
+  $('#list-sort').addEventListener('change', (e) => {
+    state.sort = e.target.value
+    renderList()
+    $('#list-sort')?.focus()
+  })
   $('#sidebar-content').querySelectorAll('.park-item').forEach((btn) => {
     btn.addEventListener('click', () => {
       const park = PARKS.find((p) => p.id === btn.dataset.id)
