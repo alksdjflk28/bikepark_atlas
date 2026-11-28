@@ -33,6 +33,8 @@ export const TR = {
     sortPriceDesc: 'Tageskarte: absteigend',
     sortLinesAsc: 'Lines: aufsteigend',
     sortLinesDesc: 'Lines: absteigend',
+    currencyLabel: 'Währung',
+    currencyNote: 'umgerechnet, feste Kurse (Nov. 2026)',
 
     factTicket: 'Tageskarte',
     factLines: 'Lines',
@@ -218,6 +220,8 @@ export const TR = {
     sortPriceDesc: 'Day ticket: high to low',
     sortLinesAsc: 'Lines: few to many',
     sortLinesDesc: 'Lines: many to few',
+    currencyLabel: 'Currency',
+    currencyNote: 'converted, fixed rates (Nov 2026)',
 
     factTicket: 'Day ticket',
     factLines: 'Lines',
@@ -403,6 +407,8 @@ export const TR = {
     sortPriceDesc: 'Biglietto giornaliero: decrescente',
     sortLinesAsc: 'Linee: crescente',
     sortLinesDesc: 'Linee: decrescente',
+    currencyLabel: 'Valuta',
+    currencyNote: 'convertito, tassi fissi (nov 2026)',
 
     factTicket: 'Biglietto giornaliero',
     factLines: 'Linee',

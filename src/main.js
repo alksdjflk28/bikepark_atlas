@@ -7,6 +7,14 @@ import { PARKS, META, loadParks } from './parks.js'
 import { pt } from './park-translations.js'
 import { initEditor } from './editor.js'
 import {
+  CURRENCIES,
+  currencyCode,
+  convertPrice,
+  formatPrice,
+  loadCurrency,
+  saveCurrency,
+} from './currency.js'
+import {
   TR,
   LANG_KEY,
   currentLang,
@@ -87,12 +95,10 @@ function dataStand() {
   return META.updatedAt ? fmtDate(META.updatedAt) : 'November 2026'
 }
 
+// Preise werden in der in der Kopfzeile gewählten Währung ausgegeben.
 function fmtPrice(price) {
   if (!price) return '–'
-  const n = Number.isInteger(price.amount)
-    ? String(price.amount)
-    : price.amount.toFixed(2).replace('.', ',')
-  return `${n} ${price.currency}`
+  return formatPrice(price.amount, price.currency, state.currency, currentLang)
 }
 
 function fmtKm(meters) {
@@ -217,7 +223,9 @@ function matches(park) {
 // Sortierung der Parkliste (Dropdown im Kopf der Liste).
 function priceValue(park) {
   const amount = park.price?.amount
-  return Number.isFinite(amount) ? amount : null
+  if (!Number.isFinite(amount)) return null
+  // In der gewählten Währung vergleichen, damit die Sortierung stimmt.
+  return convertPrice(amount, park.price.currency, state.currency) ?? amount
 }
 
 function lineValue(park) {
@@ -267,6 +275,7 @@ const state = {
   activeId: null,
   view: 'park', // 'park' | 'list'
   sort: 'default', // Sortierung der Parkliste
+  currency: loadCurrency(), // Anzeigewährung für alle Preise
   route: {
     from: null,
     fromLabel: null,
@@ -646,6 +655,11 @@ function renderPark(park) {
   const daysNote =
     park.openDays.length === 7 ? t('täglich') : `${park.openDays.length} ${t('tageProWoche')}`
   const stay = stayAdvice(park)
+  const parkCurrency = currencyCode(park.price?.currency)
+  const priceConverted =
+    Number.isFinite(park.price?.amount) &&
+    parkCurrency != null &&
+    parkCurrency !== currencyCode(state.currency)
 
   try {
     $('#sidebar-content').innerHTML = `
@@ -672,6 +686,7 @@ function renderPark(park) {
         <div class="fact-label">${t('factTicket')}</div>
         <div class="fact-value">${fmtPrice(park.price)}</div>
         <div class="fact-sub">${escapeHtml(pt(park, 'priceNote') || park.price?.note || '')}</div>
+        ${priceConverted ? `<div class="fact-note">${t('currencyNote')}</div>` : ''}
       </div>
       <div class="fact">
         <div class="fact-label">${t('factLines')}</div>
@@ -1324,8 +1339,18 @@ function renderLangSwitch() {
     .join('')
 }
 
+function renderCurrencySwitch() {
+  const select = $('#currency-select')
+  if (!select) return
+  select.innerHTML = CURRENCIES.map(
+    (code) => `<option value="${code}"${code === state.currency ? ' selected' : ''}>${code}</option>`,
+  ).join('')
+  select.setAttribute('aria-label', t('currencyLabel'))
+}
+
 function applyLang() {
   renderLangSwitch()
+  renderCurrencySwitch()
   // Alle data-i18n-Elemente im DOM aktualisieren (Text)
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     const key = el.getAttribute('data-i18n')
@@ -1354,6 +1379,18 @@ $('#lang-switch').addEventListener('click', (e) => {
   if (!btn) return
   setLang(btn.dataset.lang)
   applyLang()
+})
+
+$('#currency-select').addEventListener('change', (e) => {
+  state.currency = e.target.value
+  saveCurrency(state.currency)
+  if (state.activeId) {
+    const park = PARKS.find((p) => p.id === state.activeId)
+    if (park) renderPark(park)
+  } else if (state.view === 'list') {
+    renderList()
+  }
+  $('#currency-select')?.focus()
 })
 
 /* ------------------------------------------------------------- chrome UI (weitere) */
